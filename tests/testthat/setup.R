@@ -6,6 +6,7 @@ testthat::skip_if_not_installed("duckdb")
 # read polygons data
 countries_sf <- sf::st_read(system.file("spatial/countries.geojson", package = "duckspatial"))
 argentina_sf <- sf::st_read(system.file("spatial/argentina.geojson", package = "duckspatial"))
+rivers_sf <- sf::st_read(system.file("spatial/rivers.geojson", package = "duckspatial"))
 
 ## create points data
 set.seed(42)
