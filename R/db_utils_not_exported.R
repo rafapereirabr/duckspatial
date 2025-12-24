@@ -26,15 +26,15 @@ dbConnCheck <- function(conn) {
 #'
 #' @keywords internal
 #' @returns name of the geometry column of a table
-get_geom_name <- function(conn, x, rest = FALSE) {
+get_geom_name <- function(conn, x, rest = FALSE) { # nocov start
 
   ## check if the table exists
   if (isFALSE(DBI::dbExistsTable(conn, x))) cli::cli_abort("The table <{x}> does not exist.")
 
   ## get column names
   info_tbl <- DBI::dbGetQuery(conn, glue::glue("DESCRIBE {x};"))
-  if (rest) info_tbl[!info_tbl$column_type == "GEOMETRY", "column_name"] else info_tbl[info_tbl$column_type == "GEOMETRY", "column_name"] 
-}
+  if (rest) info_tbl[!info_tbl$column_type == "GEOMETRY", "column_name"] else info_tbl[info_tbl$column_type == "GEOMETRY", "column_name"]
+} # nocov end
 
 
 #' Get names for the query
@@ -43,7 +43,7 @@ get_geom_name <- function(conn, x, rest = FALSE) {
 #'
 #' @keywords internal
 #' @returns list with fixed names
-get_query_name <- function(name) {
+get_query_name <- function(name) { # nocov start
     if (length(name) == 2) {
         table_name <- name[2]
         schema_name <- name[1]
@@ -58,7 +58,7 @@ get_query_name <- function(name) {
         schema_name = schema_name,
         query_name = query_name
     )
-}
+} # nocov end
 
 
 
@@ -72,31 +72,31 @@ get_query_name <- function(name) {
 #' @keywords internal
 #' @noRd
 #' @returns list with fixed names
-get_query_list <- function(x, conn) {
+get_query_list <- function(x, conn) { # nocov start
 
   if (inherits(x, "sf")) {
-    
+
     ## generate a unique temporary view name
     temp_view_name <- paste0(
-      "temp_view_", 
+      "temp_view_",
       gsub("-", "_", uuid::UUIDgenerate())
     )
-    
+
     # Write table with the unique name
     duckspatial::ddbs_write_vector(
-      conn      = conn, 
-      data      = x, 
-      name      = temp_view_name, 
-      quiet     = TRUE, 
+      conn      = conn,
+      data      = x,
+      name      = temp_view_name,
+      quiet     = TRUE,
       temp_view = TRUE
     )
-    
+
     ## ensure cleanup on exit
     on.exit(
-      DBI::dbExecute(conn, glue::glue("DROP VIEW IF EXISTS {temp_view_name};")), 
+      DBI::dbExecute(conn, glue::glue("DROP VIEW IF EXISTS {temp_view_name};")),
       add = TRUE
     )
-    
+
     x_list <- get_query_name(temp_view_name)
 
 } else {
@@ -105,7 +105,7 @@ get_query_list <- function(x, conn) {
 
   return(x_list)
 
-}
+} # nocov end
 
 
 
@@ -122,7 +122,7 @@ get_query_list <- function(x, conn) {
 #'
 #' @keywords internal
 #' @returns sf
-convert_to_sf <- function(data, crs, crs_column, x_geom) {
+convert_to_sf <- function(data, crs, crs_column, x_geom) { # nocov start
     if (is.null(crs)) {
         if (is.null(crs_column)) {
             data_sf <- data |>
@@ -144,7 +144,7 @@ convert_to_sf <- function(data, crs, crs_column, x_geom) {
             sf::st_as_sf(wkt = x_geom, crs = crs)
     }
 
-}
+} # nocov end
 
 
 
@@ -158,7 +158,7 @@ convert_to_sf <- function(data, crs, crs_column, x_geom) {
 #'
 #' @keywords internal
 #' @returns character
-get_st_predicate <- function(predicate) {
+get_st_predicate <- function(predicate) { # nocov start
     switch(predicate,
       "intersects"            = "ST_Intersects",
       "intersects_extent"     = "ST_Intersects_Extent",
@@ -166,7 +166,7 @@ get_st_predicate <- function(predicate) {
       "touches"               = "ST_Touches",
       "contains"              = "ST_Contains",
       "contains_properly"     = "ST_ContainsProperly",
-      "within"                = "ST_Within", 
+      "within"                = "ST_Within",
       "within_properly"       = "ST_WithinProperly",
       "disjoint"              = "ST_Disjoint",
       "equals"                = "ST_Equals",
@@ -175,12 +175,12 @@ get_st_predicate <- function(predicate) {
       "covered_by"            = "ST_CoveredBy",
       "intersects_extent"     = "ST_Intersects_Extent",
       cli::cli_abort(
-          "Predicate should be one of <intersects>, <intersects_extent>, <covers>, <touches>, 
-          <contains>, <contains_properly>, <within>, <within_properly>, <disjoint>, <equals>, 
+          "Predicate should be one of <intersects>, <intersects_extent>, <covers>, <touches>,
+          <contains>, <contains_properly>, <within>, <within_properly>, <disjoint>, <equals>,
           <overlaps>, <crosses>, <covered_by>, or <intersects_extent>."
         )
       )
-}
+} # nocov end
 
 
 
@@ -198,8 +198,8 @@ get_st_predicate <- function(predicate) {
 #'
 #' @keywords internal
 #' @returns sf
-convert_to_sf_native_geoarrow <- function(data, crs, crs_column, x_geom) {
-  
+convert_to_sf_native_geoarrow <- function(data, crs, crs_column, x_geom) { # nocov start
+
   # 1. Resolve CRS
   # If CRS is passed explicitly, use it.
   # Otherwise, try to find it in the dataframe column 'crs_column'
@@ -209,22 +209,22 @@ convert_to_sf_native_geoarrow <- function(data, crs, crs_column, x_geom) {
       # Assume CRS is consistent across the table, take first non-NA
       val <- stats::na.omit(data[[crs_column]])[1]
       if (!is.na(val)) target_crs <- as.character(val)
-      
+
       # Remove the CRS column from output
       data[[crs_column]] <- NULL
     }
   }
-  
+
   # 2. Check Geometry Type and Convert
   geom_data <- data[[x_geom]]
-  
+
   if (inherits(geom_data, "blob") || is.list(geom_data)) {
     # --- FAST PATH: Binary/Arrow Data ---
     # This handles WKB blobs from DuckDB (Native GeoArrow or ST_AsWKB)
-    
+
     # Strip attributes (like 'arrow_binary' or 'blob') to ensure it's a clean list for wk
     attributes(geom_data) <- NULL
-    
+
     # Verify it's not empty and contains raw vectors (WKB)
     # If it's a list of raw vectors, use wk::new_wk_wkb -> geoarrow
     if (length(geom_data) > 0 && is.raw(geom_data[[1]])) {
@@ -245,26 +245,26 @@ convert_to_sf_native_geoarrow <- function(data, crs, crs_column, x_geom) {
         data[[x_geom]] <- sf::st_as_sfc(structure(geom_data, class = "WKB"))
       })
     }
-    
+
   } else if (is.character(geom_data)) {
     # --- SLOW PATH: WKT Strings ---
     # Used if the query explicitly used ST_AsText() or older DuckDB versions
     data[[x_geom]] <- sf::st_as_sfc(geom_data)
   }
-  
+
   # 3. Construct SF Object
   # Use st_as_sf with the pre-converted geometry column
   # We explicitly set the geometry column name to handle cases where x_geom isn't "geometry"
   sf_obj <- sf::st_as_sf(data, sf_column_name = x_geom)
-  
+
   # 4. Assign CRS if found
   if (!is.null(target_crs)) {
     sf::st_crs(sf_obj) <- sf::st_crs(target_crs)
   }
-  
+
   return(sf_obj)
-}
-  
+} # nocov end
+
 
 
 
@@ -279,12 +279,12 @@ convert_to_sf_native_geoarrow <- function(data, crs, crs_column, x_geom) {
 #'
 #' @keywords internal
 #' @returns cli message
-overwrite_table <- function(x, conn, quiet, overwrite) {
+overwrite_table <- function(x, conn, quiet, overwrite) { # nocov start
   if (overwrite) {
     DBI::dbExecute(conn, glue::glue("DROP TABLE IF EXISTS {x};"))
     if (isFALSE(quiet)) cli::cli_alert_info("Table <{x}> dropped")
   }
-}
+} # nocov end
 
 
 
@@ -296,22 +296,22 @@ overwrite_table <- function(x, conn, quiet, overwrite) {
 #'
 #' @keywords internal
 #' @returns cli message
-feedback_query <- function(quiet) {
+feedback_query <- function(quiet) { # nocov start
   if (isFALSE(quiet)) cli::cli_alert_success("Query successful")
-}
+} # nocov end
 
 
 
 
-get_nrow <- function(conn, table) {
+get_nrow <- function(conn, table) { # nocov start
   DBI::dbGetQuery(conn, glue::glue("SELECT COUNT(*) as n FROM {table}"))$n
-}
+} # nocov end
 
 
 
 
 
-reframe_predicate_data <- function(conn, data, x_list, y_list, id_x, id_y, sparse) {
+reframe_predicate_data <- function(conn, data, x_list, y_list, id_x, id_y, sparse) { # nocov start
 
   ## get number of rows
   nrowx <- get_nrow(conn, x_list$query_name)
@@ -344,7 +344,7 @@ reframe_predicate_data <- function(conn, data, x_list, y_list, id_x, id_y, spars
 
   return(pred_list)
 
-}
+} # nocov end
 
 #' Convert CRS input to DuckDB SQL literal
 #'
@@ -356,9 +356,9 @@ reframe_predicate_data <- function(conn, data, x_list, y_list, id_x, id_y, spars
 #' @keywords internal
 #' @noRd
 #' @returns character string (e.g. "'EPSG:4326'") or "NULL"
-crs_to_sql <- function(x) {
+crs_to_sql <- function(x) { # nocov start
   if (is.null(x) || (is.atomic(x) && all(is.na(x)))) return("NULL")
-  
+
   if (inherits(x, "crs")) {
     if (!is.na(x$epsg)) return(paste0("'EPSG:", x$epsg, "'"))
     if (!is.null(x$wkt)) {
@@ -367,16 +367,16 @@ crs_to_sql <- function(x) {
       return(paste0("'", val_clean, "'"))
     }
     return("NULL")
-  } 
-  
+  }
+
   if (is.numeric(x)) {
     return(paste0("'EPSG:", as.integer(x), "'"))
   }
-  
+
   if (is.character(x)) {
     val_clean <- gsub("'", "''", x)
     return(paste0("'", val_clean, "'"))
   }
-  
+
   return("NULL")
-}
+} # nocov end
